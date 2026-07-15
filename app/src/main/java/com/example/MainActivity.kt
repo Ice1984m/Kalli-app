@@ -139,6 +139,7 @@ data class SecurityChecklistResult(
 )
 
 enum class FindingSeverity {
+    LOW,
     MEDIUM,
     HIGH
 }
@@ -159,7 +160,9 @@ object LocalSecurityAnalyzer {
         """(?i)\b(password|passwd|token|api[_-]?key|secret)\s*[:=]\s*([^\s,;]+)"""
     )
     private val emailPattern = Regex("""\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b""")
-    private val ipv4Pattern = Regex("""\b(?:\d{1,3}\.){3}\d{1,3}\b""")
+    private val ipv4Pattern = Regex(
+        """\b(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\b"""
+    )
 
     fun analyze(text: String): LocalSecurityAnalysis {
         val findings = mutableListOf<SecurityFinding>()
@@ -177,7 +180,9 @@ object LocalSecurityAnalyzer {
             }
         }
         val sanitized = text
-            .replace(credentialPattern) { "${it.groupValues[1]}=[REDACTED]" }
+            .replace(credentialPattern) {
+                "${it.value.substringBefore('=').substringBefore(':').trim()}=[REDACTED]"
+            }
             .replace(emailPattern, "[REDACTED_EMAIL]")
             .replace(ipv4Pattern, "[REDACTED_IP]")
         return LocalSecurityAnalysis(findings, sanitized)
