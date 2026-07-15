@@ -27,7 +27,7 @@ Run `./gradlew assembleDebug`. The APK is created at
 
 ### 3. Install directly on Android from GitHub
 
-[Download and install the latest APK](https://github.com/Ice1984m/Kalli-app/releases/latest/download/app-debug.apk)
+[Download and install the latest APK](https://github.com/Ice1984m/Kalli-app/releases/download/apk-latest/app-debug.apk)
 
 Open this link on an Android device to start the download. When it finishes, open the
 download and confirm Android's installation prompt. You may need to allow your browser
