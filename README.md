@@ -8,14 +8,27 @@ This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/6fd3f50a-dcd1-4147-b2b5-f450f7a3a299
 
-## Run Locally
+## Installation options
 
-**Prerequisites:**  [Android Studio](https://developer.android.com/studio)
+### 1. Run with Android Studio
 
+**Prerequisites:** [Android Studio](https://developer.android.com/studio)
 
-1. Open Android Studio
-2. Select **Open** and choose the directory containing this project
+1. Open Android Studio.
+2. Select **Open** and choose the directory containing this project.
 3. Allow Android Studio to fix any incompatibilities as it imports the project.
-4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file to your Gemini API key (see `.env.example` for an example)
-5. Remove this line from the app's `build.gradle.kts` file: `signingConfig = signingConfigs.getByName("debugConfig")`
-6. Run the app on an emulator or physical device
+4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file (see `.env.example`).
+5. Run the app on an emulator or physical device.
+
+### 2. Build the APK locally
+
+Run `./gradlew assembleDebug`. The APK is created at
+`app/build/outputs/apk/debug/app-debug.apk`.
+
+### 3. Install directly on Android from GitHub
+
+[Download and install the latest APK](https://github.com/Ice1984m/Kalli-app/releases/download/apk-latest/app-debug.apk)
+
+Open this link on an Android device to start the download. When it finishes, open the
+download and confirm Android's installation prompt. You may need to allow your browser
+or file manager to install unknown apps.
