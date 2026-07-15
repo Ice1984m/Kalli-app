@@ -1,6 +1,7 @@
 package com.example
 
 import android.content.Context
+import android.app.ActivityManager
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -187,6 +188,8 @@ class KaliViewModel(
     // --- Real-time Hardware Interface States ---
     val hardwareInterfaces = mutableStateListOf<HardwareInterface>()
     var isPollingActive by mutableStateOf(true)
+    var ramUsage by mutableStateOf(0f)
+    var ramUsageLabel by mutableStateOf("RAM Gebruik: Niet beschikbaar")
 
     // --- Threat / Intrusion Warning States ---
     var isIntrusionAlertActive by mutableStateOf(false)
@@ -503,6 +506,7 @@ class KaliViewModel(
         
         // Load default mock wireless networks
         generateMockNetworks()
+        refreshSystemDiagnostics()
 
         // Populate initial hardware interfaces
         hardwareInterfaces.addAll(listOf(
@@ -521,6 +525,24 @@ class KaliViewModel(
         logHistoryEvent("AI Copilot", "AI Response", "Gemini Ethical Hacking Copilot geïnitialiseerd", "Chat-assistent geladen met offline-fallbacks en handelingen")
         logHistoryEvent("Interface Config", "Polling Status", "Real-time netwerkpolling geactiveerd", "Polling-interval ingesteld op 3000ms")
         logHistoryEvent("System Action", "Security Shield", "Poort-beveiliging en DNS-controle voltooid", "Status: Systeem veilig, Geen externe traceringen gedetecteerd")
+    }
+
+    fun refreshSystemDiagnostics() {
+        val memoryInfo = ActivityManager.MemoryInfo()
+        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        activityManager?.getMemoryInfo(memoryInfo)
+
+        if (memoryInfo.totalMem > 0) {
+            val usedMemory = memoryInfo.totalMem - memoryInfo.availMem
+            val gigabyte = 1024.0 * 1024.0 * 1024.0
+            ramUsage = (usedMemory.toFloat() / memoryInfo.totalMem).coerceIn(0f, 1f)
+            ramUsageLabel = String.format(
+                Locale.US,
+                "RAM Gebruik: %.1f GB / %.1f GB",
+                usedMemory / gigabyte,
+                memoryInfo.totalMem / gigabyte
+            )
+        }
     }
 
     // Helper functions for reactive state flows
@@ -2489,7 +2511,23 @@ fun DashboardTab(viewModel: KaliViewModel) {
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 // System stats (Mock live values)
-                Text(text = "Systeembelasting", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "Systeembelasting", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                    IconButton(
+                        onClick = { viewModel.refreshSystemDiagnostics() },
+                        modifier = Modifier.testTag("refresh_system_diagnostics_button")
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Vernieuw systeemdiagnostiek",
+                            tint = KaliPrimary
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Row(
@@ -2501,8 +2539,8 @@ fun DashboardTab(viewModel: KaliViewModel) {
                         LinearProgressIndicator(progress = 0.42f, color = KaliPrimary, trackColor = KaliSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(top = 4.dp).height(6.dp).clip(RoundedCornerShape(3.dp)))
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "RAM Gebruik: 1.8 GB / 4.0 GB", fontSize = 11.sp, color = Color.White)
-                        LinearProgressIndicator(progress = 0.45f, color = KaliSecondary, trackColor = KaliSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(top = 4.dp).height(6.dp).clip(RoundedCornerShape(3.dp)))
+                        Text(text = viewModel.ramUsageLabel, fontSize = 11.sp, color = Color.White)
+                        LinearProgressIndicator(progress = viewModel.ramUsage, color = KaliSecondary, trackColor = KaliSurfaceVariant, modifier = Modifier.fillMaxWidth().padding(top = 4.dp).height(6.dp).clip(RoundedCornerShape(3.dp)))
                     }
                 }
             }
