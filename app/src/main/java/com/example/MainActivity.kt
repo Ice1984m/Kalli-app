@@ -1628,59 +1628,6 @@ class KaliViewModel(
                         }
                     }
 
-                    private suspend fun callOpenAiApiRest(prompt: String): String = withContext(Dispatchers.IO) {
-                        val apiKey = com.example.BuildConfig.OPENAI_API_KEY
-                        if (apiKey.isEmpty() || apiKey == "MY_OPENAI_API_KEY") {
-                            return@withContext "**[GPT CHAT NIET INGESTELD]**\n\nVoeg `OPENAI_API_KEY` toe aan je lokale `.env`-bestand en bouw de app opnieuw om GPT Chat te gebruiken."
-                        }
-
-                        try {
-                            val jsonMediaType = "application/json; charset=utf-8".toMediaType()
-                            val requestBody = JSONObject().apply {
-                                put("model", "gpt-4.1-mini")
-                                put("messages", JSONArray().apply {
-                                    put(JSONObject().apply {
-                                        put("role", "system")
-                                        put("content", "Je bent een deskundige, defensieve cyberbeveiligingscoach. Antwoord in het Nederlands en help alleen met geautoriseerde, ethische beveiligingsvragen.")
-                                    })
-                                    put(JSONObject().apply {
-                                        put("role", "user")
-                                        put("content", prompt)
-                                    })
-                                })
-                            }
-
-                            val request = Request.Builder()
-                                .url("https://api.openai.com/v1/chat/completions")
-                                .header("Authorization", "******")
-                                .post(requestBody.toString().toRequestBody(jsonMediaType))
-                                .build()
-
-                            OkHttpClient.Builder()
-                                .connectTimeout(30, TimeUnit.SECONDS)
-                                .readTimeout(30, TimeUnit.SECONDS)
-                                .build()
-                                .newCall(request)
-                                .execute()
-                                .use { response ->
-                                    if (!response.isSuccessful) {
-                                        return@withContext "**[GPT CHAT FOUT]**\n\nDe GPT-service kon het verzoek niet verwerken (HTTP ${response.code}). Controleer je API-sleutel en accountinstellingen."
-                                    }
-
-                                    val body = response.body?.string().orEmpty()
-                                    val choices = JSONObject(body).optJSONArray("choices")
-                                    val content = choices
-                                        ?.optJSONObject(0)
-                                        ?.optJSONObject("message")
-                                        ?.optString("content")
-                                        ?.trim()
-                                    content?.takeIf { it.isNotEmpty() }
-                                        ?: "**[GPT CHAT FOUT]**\n\nDe GPT-service stuurde geen leesbaar antwoord terug."
-                                }
-                        } catch (e: Exception) {
-                            "**[GPT CHAT VERBINDINGSFOUT]**\n\nEr kon geen verbinding met de GPT-service worden gemaakt. Probeer het opnieuw."
-                        }
-                    }
                 } catch (e: Exception) {
                     if (attempts >= maxAttempts) {
                         throw e
@@ -1740,6 +1687,60 @@ class KaliViewModel(
                 )
             }
             offlineFallback ?: "Fout: ${e.message}. Controleer je internetverbinding."
+        }
+    }
+
+    private suspend fun callOpenAiApiRest(prompt: String): String = withContext(Dispatchers.IO) {
+        val apiKey = com.example.BuildConfig.OPENAI_API_KEY
+        if (apiKey.isEmpty() || apiKey == "MY_OPENAI_API_KEY") {
+            return@withContext "**[GPT CHAT NIET INGESTELD]**\n\nVoeg `OPENAI_API_KEY` toe aan je lokale `.env`-bestand en bouw de app opnieuw om GPT Chat te gebruiken."
+        }
+
+        try {
+            val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+            val requestBody = JSONObject().apply {
+                put("model", "gpt-4.1-mini")
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "system")
+                        put("content", "Je bent een deskundige, defensieve cyberbeveiligingscoach. Antwoord in het Nederlands en help alleen met geautoriseerde, ethische beveiligingsvragen.")
+                    })
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", prompt)
+                    })
+                })
+            }
+
+            val request = Request.Builder()
+                .url("https://api.openai.com/v1/chat/completions")
+                .header("Authorization", listOf("Bearer", apiKey).joinToString(" "))
+                .post(requestBody.toString().toRequestBody(jsonMediaType))
+                .build()
+
+            OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build()
+                .newCall(request)
+                .execute()
+                .use { response ->
+                    if (!response.isSuccessful) {
+                        return@withContext "**[GPT CHAT FOUT]**\n\nDe GPT-service kon het verzoek niet verwerken (HTTP ${response.code}). Controleer je API-sleutel en accountinstellingen."
+                    }
+
+                    val body = response.body?.string().orEmpty()
+                    val choices = JSONObject(body).optJSONArray("choices")
+                    val content = choices
+                        ?.optJSONObject(0)
+                        ?.optJSONObject("message")
+                        ?.optString("content")
+                        ?.trim()
+                    content?.takeIf { it.isNotEmpty() }
+                        ?: "**[GPT CHAT FOUT]**\n\nDe GPT-service stuurde geen leesbaar antwoord terug."
+                }
+        } catch (e: Exception) {
+            "**[GPT CHAT VERBINDINGSFOUT]**\n\nEr kon geen verbinding met de GPT-service worden gemaakt. Probeer het opnieuw."
         }
     }
     
