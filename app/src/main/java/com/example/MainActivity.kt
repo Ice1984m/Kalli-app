@@ -155,7 +155,7 @@ data class LocalSecurityAnalysis(
 
 object LocalSecurityAnalyzer {
     private val credentialPattern = Regex(
-        """(?i)\b(password|passwd|token|api[_-]?key|secret)(\s*[:=]\s*)(?:[^\s,;]+)"""
+        """(?i)\b(password|passwd|token|api[_-]?key|secret)(\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)"""
     )
     private val emailPattern = Regex("""\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b""")
     private val ipv4Pattern = Regex(
@@ -182,9 +182,7 @@ object LocalSecurityAnalyzer {
             }
         }
         val sanitized = text
-            .replace(credentialPattern) {
-                "${it.groups[1]?.value ?: "secret"}${it.groups[2]?.value ?: "="}[REDACTED]"
-            }
+            .replace(credentialPattern, "[REDACTED_CREDENTIAL]")
             .replace(emailPattern, "[REDACTED_EMAIL]")
             .replace(ipv4Pattern, "[REDACTED_IP]")
         return LocalSecurityAnalysis(findings, sanitized)
