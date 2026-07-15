@@ -126,6 +126,11 @@ data class ChatMessage(
     val timestamp: Long = System.currentTimeMillis()
 )
 
+enum class AiProvider(val label: String) {
+    GEMINI("Gemini Pro"),
+    GPT("GPT Chat")
+}
+
 // --- TERMINAL HISTORY EVENT MODEL ---
 data class TerminalHistoryEvent(
     val id: String = UUID.randomUUID().toString(),
@@ -232,9 +237,10 @@ class KaliViewModel(
         logHistoryEvent("System Action", "System Initialized", "Terminalgeschiedenis gewist door gebruiker")
     }
     
-    // Gemini AI Chat
+    // AI Chat
     var isChatLoading by mutableStateOf(false)
     val chatHistory = mutableStateListOf<ChatMessage>()
+    var selectedAiProvider by mutableStateOf(AiProvider.GEMINI)
     
     // --- COPILOT SUB-TABS & AI HACKING HELPER & LICENSE STATES ---
     var activeCopilotSubTab by mutableStateOf("chat") // "chat", "hack_helper", "license"
@@ -1383,7 +1389,7 @@ class KaliViewModel(
         logHistoryEvent("AI Copilot", "User Query", userPrompt)
         
         scope.launch {
-            val responseText = callGeminiApiRest(userPrompt)
+            val responseText = callAiApi(userPrompt)
             var cleanText = responseText
             
             // Execute automated UI configuration changes requested or guided by AI response
@@ -1440,7 +1446,7 @@ class KaliViewModel(
                      "Houd de toon professioneel en educatief."
                      
         scope.launch {
-            val response = callGeminiApiRest(prompt)
+            val response = callAiApi(prompt)
             generatedAiHelperPayloadResult = response
             isGeneratingAiHelperPayload = false
             logHistoryEvent("AI Hack-Bot", "Payload Generated", "Ethische exploit blueprint gegenereerd voor $target via $attackType", "AI Beveiligingsanalyse voltooid")
@@ -1466,6 +1472,13 @@ class KaliViewModel(
             teamRegistrationStatus = "Succes: $emailClean is toegevoegd als geautoriseerd teamlid!"
             logHistoryEvent("GitHub Team", "Member Authorized", "Nieuw teamlid geautoriseerd: $emailClean", "Gekoppeld aan repository ice1984m/kali-suite")
             teamEmailInput = ""
+        }
+    }
+
+    private suspend fun callAiApi(prompt: String): String {
+        return when (selectedAiProvider) {
+            AiProvider.GEMINI -> callGeminiApiRest(prompt)
+            AiProvider.GPT -> callOpenAiApiRest(prompt)
         }
     }
 
@@ -1581,7 +1594,7 @@ class KaliViewModel(
                 attempts++
                 try {
                     val request = Request.Builder()
-                        .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$apiKey")
+                        .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=$apiKey")
                         .post(jsonBody.toString().toRequestBody(jsonMediaType))
                         .build()
 
@@ -1614,6 +1627,7 @@ class KaliViewModel(
                             break
                         }
                     }
+
                 } catch (e: Exception) {
                     if (attempts >= maxAttempts) {
                         throw e
@@ -1673,6 +1687,60 @@ class KaliViewModel(
                 )
             }
             offlineFallback ?: "Fout: ${e.message}. Controleer je internetverbinding."
+        }
+    }
+
+    private suspend fun callOpenAiApiRest(prompt: String): String = withContext(Dispatchers.IO) {
+        val apiKey = com.example.BuildConfig.OPENAI_API_KEY
+        if (apiKey.isEmpty() || apiKey == "MY_OPENAI_API_KEY") {
+            return@withContext "**[GPT CHAT NIET INGESTELD]**\n\nVoeg `OPENAI_API_KEY` toe aan je lokale `.env`-bestand en bouw de app opnieuw om GPT Chat te gebruiken."
+        }
+
+        try {
+            val jsonMediaType = "application/json; charset=utf-8".toMediaType()
+            val requestBody = JSONObject().apply {
+                put("model", "gpt-4.1-mini")
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "system")
+                        put("content", "Je bent een deskundige, defensieve cyberbeveiligingscoach. Antwoord in het Nederlands en help alleen met geautoriseerde, ethische beveiligingsvragen.")
+                    })
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", prompt)
+                    })
+                })
+            }
+
+            val request = Request.Builder()
+                .url("https://api.openai.com/v1/chat/completions")
+                .header("Authorization", listOf("Bearer", apiKey).joinToString(" "))
+                .post(requestBody.toString().toRequestBody(jsonMediaType))
+                .build()
+
+            OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build()
+                .newCall(request)
+                .execute()
+                .use { response ->
+                    if (!response.isSuccessful) {
+                        return@withContext "**[GPT CHAT FOUT]**\n\nDe GPT-service kon het verzoek niet verwerken (HTTP ${response.code}). Controleer je API-sleutel en accountinstellingen."
+                    }
+
+                    val body = response.body?.string().orEmpty()
+                    val choices = JSONObject(body).optJSONArray("choices")
+                    val content = choices
+                        ?.optJSONObject(0)
+                        ?.optJSONObject("message")
+                        ?.optString("content")
+                        ?.trim()
+                    content?.takeIf { it.isNotEmpty() }
+                        ?: "**[GPT CHAT FOUT]**\n\nDe GPT-service stuurde geen leesbaar antwoord terug."
+                }
+        } catch (e: Exception) {
+            "**[GPT CHAT VERBINDINGSFOUT]**\n\nEr kon geen verbinding met de GPT-service worden gemaakt. Probeer het opnieuw."
         }
     }
     
@@ -3730,8 +3798,23 @@ fun CopilotTab(viewModel: KaliViewModel) {
         // 1. AI COPILOT CHAT SUB-TAB
         if (viewModel.activeCopilotSubTab == "chat") {
             Column(modifier = Modifier.fillMaxSize().weight(1f)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AiProvider.entries.forEach { provider ->
+                        FilterChip(
+                            selected = viewModel.selectedAiProvider == provider,
+                            onClick = { viewModel.selectedAiProvider = provider },
+                            label = { Text(provider.label) },
+                            modifier = Modifier.testTag("ai_provider_${provider.name.lowercase()}")
+                        )
+                    }
+                }
                 Text(
-                    text = "Gemini Ethical Hacking Copilot",
+                    text = "${viewModel.selectedAiProvider.label} Ethical Hacking Copilot",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -3819,7 +3902,7 @@ fun CopilotTab(viewModel: KaliViewModel) {
                             ) {
                                 CircularProgressIndicator(modifier = Modifier.size(14.dp), color = KaliPrimary, strokeWidth = 2.dp)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(text = "Gemini denkt na...", fontSize = 11.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
+                                Text(text = "${viewModel.selectedAiProvider.label} denkt na...", fontSize = 11.sp, color = Color.Gray, fontFamily = FontFamily.Monospace)
                             }
                         }
                     }
