@@ -133,8 +133,6 @@ enum class AiProvider(val label: String) {
 }
 
 data class SecurityChecklistResult(
-    val completedItems: Int,
-    val totalItems: Int,
     val items: List<String>
 )
 
@@ -157,7 +155,7 @@ data class LocalSecurityAnalysis(
 
 object LocalSecurityAnalyzer {
     private val credentialPattern = Regex(
-        """(?i)\b(password|passwd|token|api[_-]?key|secret)\s*[:=]\s*([^\s,;]+)"""
+        """(?i)\b(password|passwd|token|api[_-]?key|secret)(\s*[:=]\s*)(?:[^\s,;]+)"""
     )
     private val emailPattern = Regex("""\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b""")
     private val ipv4Pattern = Regex(
@@ -168,20 +166,21 @@ object LocalSecurityAnalyzer {
         val findings = mutableListOf<SecurityFinding>()
         text.lines().forEachIndexed { index, line ->
             val lineNumber = index + 1
-            if (credentialPattern.containsMatchIn(line)) {
+            val activeLine = line.trimStart()
+            if (activeLine.startsWith("#")) return@forEachIndexed
+            if (credentialPattern.containsMatchIn(activeLine)) {
                 findings += SecurityFinding(lineNumber, FindingSeverity.HIGH, "Mogelijk geheim of wachtwoord aangetroffen.")
             }
-            if (line.contains("http://", ignoreCase = true)) {
+            if (activeLine.contains("http://", ignoreCase = true)) {
                 findings += SecurityFinding(lineNumber, FindingSeverity.MEDIUM, "Onversleutelde HTTP-verbinding aangetroffen; gebruik HTTPS.")
             }
-            if (line.contains("permitrootlogin yes", ignoreCase = true) ||
-                line.contains("passwordauthentication yes", ignoreCase = true)) {
+            if (Regex("""(?i)^(permitrootlogin|passwordauthentication)\s+yes\b""").containsMatchIn(activeLine)) {
                 findings += SecurityFinding(lineNumber, FindingSeverity.HIGH, "Onveilige SSH-instelling aangetroffen.")
             }
         }
         val sanitized = text
             .replace(credentialPattern) {
-                "${it.value.substringBefore('=').substringBefore(':').trim()}=[REDACTED]"
+                "${it.groupValues[1]}${it.groupValues[2]}[REDACTED]"
             }
             .replace(emailPattern, "[REDACTED_EMAIL]")
             .replace(ipv4Pattern, "[REDACTED_IP]")
@@ -297,8 +296,6 @@ class KaliViewModel(
 
     fun runSecurityChecklist() {
         securityChecklist = SecurityChecklistResult(
-            completedItems = 0,
-            totalItems = 5,
             items = listOf(
                 "Bevestig schriftelijke toestemming en scope vóór een test.",
                 "Gebruik uitsluitend testaccounts en eigen of geautoriseerde systemen.",
@@ -4075,7 +4072,7 @@ fun CopilotTab(viewModel: KaliViewModel) {
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Text(
-                                "${checklist.completedItems}/${checklist.totalItems} afgerond",
+                                "Vijf preventieve stappen",
                                 color = KaliPrimary,
                                 fontWeight = FontWeight.Bold
                             )
@@ -4101,7 +4098,7 @@ fun CopilotTab(viewModel: KaliViewModel) {
             ) {
                 Text("Lokale log- en configuratieanalyse", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Text(
-                    "Plak alleen gegevens waarvoor je bevoegd bent. De analyse vindt lokaal plaats; geheimen en identificerende waarden worden in het resultaat gemaskeerd.",
+                    "Plak alleen gegevens waarvoor je bevoegd bent. De analyse vindt lokaal plaats; geheimen, e-mailadressen en alle geldige IPv4-adressen worden in het resultaat gemaskeerd.",
                     fontSize = 12.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(vertical = 8.dp)
