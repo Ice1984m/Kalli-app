@@ -4215,7 +4215,7 @@ fun CopilotTab(viewModel: KaliViewModel) {
                                 .padding(8.dp)
                         ) {
                             Text(
-                                text = "OWNER ID: ice1984m (GitHub)\nREPO: github.com/ice1984m/kali-suite\nLICENTIE: MIT-Standard-Active",
+                                text = "OWNER ID: ice1984m (GitHub)\nREPO: github.com/Ice1984m/Kalli-app\nAPK: https://github.com/Ice1984m/Kalli-app/releases/download/apk-latest/app-debug.apk\nLICENTIE: MIT-Standard-Active",
                                 fontSize = 10.sp,
                                 fontFamily = FontFamily.Monospace,
                                 color = KaliPrimary
