@@ -138,9 +138,14 @@ data class SecurityChecklistResult(
     val items: List<String>
 )
 
+enum class FindingSeverity(val label: String) {
+    MEDIUM("MIDDEL"),
+    HIGH("HOOG")
+}
+
 data class SecurityFinding(
     val lineNumber: Int,
-    val severity: String,
+    val severity: FindingSeverity,
     val description: String
 )
 
@@ -161,14 +166,14 @@ object LocalSecurityAnalyzer {
         text.lines().forEachIndexed { index, line ->
             val lineNumber = index + 1
             if (credentialPattern.containsMatchIn(line)) {
-                findings += SecurityFinding(lineNumber, "HOOG", "Mogelijk geheim of wachtwoord aangetroffen.")
+                findings += SecurityFinding(lineNumber, FindingSeverity.HIGH, "Mogelijk geheim of wachtwoord aangetroffen.")
             }
             if (line.contains("http://", ignoreCase = true)) {
-                findings += SecurityFinding(lineNumber, "MIDDEL", "Onversleutelde HTTP-verbinding aangetroffen; gebruik HTTPS.")
+                findings += SecurityFinding(lineNumber, FindingSeverity.MEDIUM, "Onversleutelde HTTP-verbinding aangetroffen; gebruik HTTPS.")
             }
             if (line.contains("permitrootlogin yes", ignoreCase = true) ||
                 line.contains("passwordauthentication yes", ignoreCase = true)) {
-                findings += SecurityFinding(lineNumber, "HOOG", "Onveilige SSH-instelling aangetroffen.")
+                findings += SecurityFinding(lineNumber, FindingSeverity.HIGH, "Onveilige SSH-instelling aangetroffen.")
             }
         }
         val sanitized = text
@@ -4126,7 +4131,7 @@ fun CopilotTab(viewModel: KaliViewModel) {
                     } else {
                         analysis.findings.forEach { finding ->
                             Text(
-                                "Regel ${finding.lineNumber} · ${finding.severity}: ${finding.description}",
+                                "Regel ${finding.lineNumber} · ${finding.severity.label}: ${finding.description}",
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 modifier = Modifier.padding(top = 8.dp)
