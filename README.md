@@ -8,6 +8,12 @@ This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/6fd3f50a-dcd1-4147-b2b5-f450f7a3a299
 
+## APK downloaden op Android
+
+[<img alt="Download de Android APK" src="https://img.shields.io/badge/Download-Android%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white">](https://github.com/Ice1984m/Kalli-app/releases/latest/download/app-debug.apk)
+
+Klik op de knop op je Android-apparaat om de nieuwste APK meteen te downloaden. Open daarna de downloadmelding en bevestig de installatie. Android kan eenmalig toestemming vragen om apps uit deze browser of bestandsbeheerder te installeren.
+
 ## Run Locally
 
 **Prerequisites:**  [Android Studio](https://developer.android.com/studio)
