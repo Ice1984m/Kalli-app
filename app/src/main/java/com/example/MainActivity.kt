@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -64,6 +65,8 @@ import android.Manifest
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
+
+private const val APK_DOWNLOAD_URL = "https://github.com/Ice1984m/Kalli-app/releases/latest/download/app-release.apk"
 
 // --- MAIN ACTIVITY ---
 class MainActivity : ComponentActivity() {
@@ -1902,6 +1905,7 @@ fun TopStatusPanel(viewModel: KaliViewModel) {
 @Composable
 fun DashboardTab(viewModel: KaliViewModel) {
     val lazyListState = rememberLazyListState()
+    val uriHandler = LocalUriHandler.current
     
     // Automatically scrolls terminal to the end when logs change
     LaunchedEffect(viewModel.terminalLogs.size) {
@@ -1916,6 +1920,51 @@ fun DashboardTab(viewModel: KaliViewModel) {
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 12.dp)
     ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = KaliSurface),
+            border = BorderStroke(1.dp, KaliPrimary),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp, bottom = 12.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = "APK Installatie",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Tik op de knop om de APK op dit apparaat te installeren.",
+                    fontSize = 11.sp,
+                    color = Color.LightGray
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = APK_DOWNLOAD_URL,
+                    fontSize = 10.sp,
+                    color = KaliSecondary,
+                    fontFamily = FontFamily.Monospace
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(
+                    onClick = { uriHandler.openUri(APK_DOWNLOAD_URL) },
+                    colors = ButtonDefaults.buttonColors(containerColor = KaliPrimary),
+                    modifier = Modifier.fillMaxWidth().height(38.dp)
+                ) {
+                    Icon(Icons.Default.Download, contentDescription = null, tint = Color.Black)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Tik hier om te installeren",
+                        color = Color.Black,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
         // --- 1. INTRA-INTRUSION / TRACE ALERT WARNING COMPONENT ---
         if (viewModel.isIntrusionAlertActive) {
             val alertAnimTransition = rememberInfiniteTransition()
