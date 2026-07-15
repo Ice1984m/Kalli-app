@@ -83,6 +83,7 @@ class MainActivity : ComponentActivity() {
                         override fun <T : ViewModel> create(modelClass: Class<T>): T {
                             return KaliViewModel(handshakeDao, applicationContext) as T
                         }
+
                     }
                 )
                 
@@ -129,6 +130,53 @@ data class ChatMessage(
 enum class AiProvider(val label: String) {
     GEMINI("Gemini Pro"),
     GPT("GPT Chat")
+}
+
+data class SecurityChecklistResult(
+    val completedItems: Int,
+    val totalItems: Int,
+    val items: List<String>
+)
+
+data class SecurityFinding(
+    val lineNumber: Int,
+    val severity: String,
+    val description: String
+)
+
+data class LocalSecurityAnalysis(
+    val findings: List<SecurityFinding>,
+    val sanitizedText: String
+)
+
+object LocalSecurityAnalyzer {
+    private val credentialPattern = Regex(
+        """(?i)\b(password|passwd|token|api[_-]?key|secret)\s*[:=]\s*([^\s,;]+)"""
+    )
+    private val emailPattern = Regex("""\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b""")
+    private val ipv4Pattern = Regex("""\b(?:\d{1,3}\.){3}\d{1,3}\b""")
+
+    fun analyze(text: String): LocalSecurityAnalysis {
+        val findings = mutableListOf<SecurityFinding>()
+        text.lines().forEachIndexed { index, line ->
+            val lineNumber = index + 1
+            if (credentialPattern.containsMatchIn(line)) {
+                findings += SecurityFinding(lineNumber, "HOOG", "Mogelijk geheim of wachtwoord aangetroffen.")
+            }
+            if (line.contains("http://", ignoreCase = true)) {
+                findings += SecurityFinding(lineNumber, "MIDDEL", "Onversleutelde HTTP-verbinding aangetroffen; gebruik HTTPS.")
+            }
+            if (line.contains("permitrootlogin yes", ignoreCase = true) ||
+                line.contains("passwordauthentication yes", ignoreCase = true)) {
+                findings += SecurityFinding(lineNumber, "HOOG", "Onveilige SSH-instelling aangetroffen.")
+            }
+        }
+        val sanitized = text
+            .replace(credentialPattern) { "${it.groupValues[1]}=[REDACTED]" }
+            .replace(emailPattern, "[REDACTED_EMAIL]")
+            .replace(ipv4Pattern, "[REDACTED_IP]")
+        return LocalSecurityAnalysis(findings, sanitized)
+    }
 }
 
 // --- TERMINAL HISTORY EVENT MODEL ---
@@ -236,11 +284,38 @@ class KaliViewModel(
         terminalHistoryEvents.clear()
         logHistoryEvent("System Action", "System Initialized", "Terminalgeschiedenis gewist door gebruiker")
     }
+
+    fun runSecurityChecklist() {
+        securityChecklist = SecurityChecklistResult(
+            completedItems = 0,
+            totalItems = 5,
+            items = listOf(
+                "Bevestig schriftelijke toestemming en scope vóór een test.",
+                "Gebruik uitsluitend testaccounts en eigen of geautoriseerde systemen.",
+                "Werk besturingssysteem, apps en beveiligingspatches bij.",
+                "Gebruik MFA en unieke wachtwoorden voor beheerdersaccounts.",
+                "Bewaar logs zonder persoonsgegevens of geheimen."
+            )
+        )
+        logHistoryEvent("Defensieve assistent", "Checklist Generated", "Lokale securitychecklist aangemaakt")
+    }
+
+    fun analyzeSecurityInput() {
+        localSecurityAnalysis = LocalSecurityAnalyzer.analyze(securityAnalysisInput)
+        logHistoryEvent(
+            "Defensieve assistent",
+            "Local Analysis",
+            "${localSecurityAnalysis?.findings?.size ?: 0} bevinding(en) in lokaal aangeleverde tekst"
+        )
+    }
     
     // AI Chat
     var isChatLoading by mutableStateOf(false)
     val chatHistory = mutableStateListOf<ChatMessage>()
     var selectedAiProvider by mutableStateOf(AiProvider.GEMINI)
+    var securityChecklist by mutableStateOf<SecurityChecklistResult?>(null)
+    var securityAnalysisInput by mutableStateOf("")
+    var localSecurityAnalysis by mutableStateOf<LocalSecurityAnalysis?>(null)
     
     // --- COPILOT SUB-TABS & AI HACKING HELPER & LICENSE STATES ---
     var activeCopilotSubTab by mutableStateOf("chat") // "chat", "hack_helper", "license"
@@ -3762,6 +3837,8 @@ fun CopilotTab(viewModel: KaliViewModel) {
         ) {
             val subTabs = listOf(
                 Triple("chat", "AI Copilot", Icons.Default.Psychology),
+                Triple("checklist", "Checklist", Icons.Default.Shield),
+                Triple("log_analysis", "Logscan", Icons.Default.Description),
                 Triple("hack_helper", "AI Hack-Bot", Icons.Default.Terminal),
                 Triple("license", "Licenties & Team", Icons.Default.Shield)
             )
@@ -3955,6 +4032,116 @@ fun CopilotTab(viewModel: KaliViewModel) {
                     ) {
                         Icon(Icons.Default.Send, contentDescription = "Verstuur", tint = Color.Black)
                     }
+                }
+            }
+        }
+
+        if (viewModel.activeCopilotSubTab == "checklist") {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text("Defensieve securitychecklist", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    "Lokale checklist voor geautoriseerde securitytests. Er worden geen acties uitgevoerd.",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                Button(
+                    onClick = { viewModel.runSecurityChecklist() },
+                    colors = ButtonDefaults.buttonColors(containerColor = KaliPrimary),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Genereer checklist", color = Color.Black)
+                }
+                viewModel.securityChecklist?.let { checklist ->
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = KaliSurface),
+                        border = BorderStroke(1.dp, KaliSurfaceVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                "${checklist.completedItems}/${checklist.totalItems} afgerond",
+                                color = KaliPrimary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            checklist.items.forEachIndexed { index, item ->
+                                Text(
+                                    text = "${index + 1}. $item",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 10.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (viewModel.activeCopilotSubTab == "log_analysis") {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text("Lokale log- en configuratieanalyse", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(
+                    "Plak alleen gegevens waarvoor je bevoegd bent. De analyse vindt lokaal plaats; geheimen en identificerende waarden worden in het resultaat gemaskeerd.",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+                OutlinedTextField(
+                    value = viewModel.securityAnalysisInput,
+                    onValueChange = { viewModel.securityAnalysisInput = it },
+                    label = { Text("Log of configuratie") },
+                    minLines = 8,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = KaliPrimary,
+                        unfocusedBorderColor = KaliSurfaceVariant
+                    )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { viewModel.analyzeSecurityInput() },
+                    enabled = viewModel.securityAnalysisInput.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = KaliPrimary),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Lokaal analyseren", color = Color.Black)
+                }
+                viewModel.localSecurityAnalysis?.let { analysis ->
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Bevindingen: ${analysis.findings.size}", color = KaliPrimary, fontWeight = FontWeight.Bold)
+                    if (analysis.findings.isEmpty()) {
+                        Text("Geen bekende patronen gevonden.", color = Color.LightGray, modifier = Modifier.padding(top = 6.dp))
+                    } else {
+                        analysis.findings.forEach { finding ->
+                            Text(
+                                "Regel ${finding.lineNumber} · ${finding.severity}: ${finding.description}",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Gemaskerde uitvoer", color = KaliPrimary, fontWeight = FontWeight.Bold)
+                    Text(
+                        analysis.sanitizedText,
+                        color = Color.LightGray,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
                 }
             }
         }
