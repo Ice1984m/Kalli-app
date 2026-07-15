@@ -138,9 +138,9 @@ data class SecurityChecklistResult(
     val items: List<String>
 )
 
-enum class FindingSeverity(val label: String) {
-    MEDIUM("MIDDEL"),
-    HIGH("HOOG")
+enum class FindingSeverity {
+    MEDIUM,
+    HIGH
 }
 
 data class SecurityFinding(
@@ -4131,7 +4131,7 @@ fun CopilotTab(viewModel: KaliViewModel) {
                     } else {
                         analysis.findings.forEach { finding ->
                             Text(
-                                "Regel ${finding.lineNumber} · ${finding.severity.label}: ${finding.description}",
+                                "Regel ${finding.lineNumber} · ${finding.severity.name}: ${finding.description}",
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 modifier = Modifier.padding(top = 8.dp)
