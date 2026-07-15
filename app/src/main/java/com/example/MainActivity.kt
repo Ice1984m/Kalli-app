@@ -39,6 +39,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,15 +60,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.net.Uri
 import android.net.wifi.WifiManager
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.core.content.ContextCompat
 import android.Manifest
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
-
-private const val APK_DOWNLOAD_URL = "https://github.com/Ice1984m/Kalli-app/releases/latest/download/app-release.apk"
 
 // --- MAIN ACTIVITY ---
 class MainActivity : ComponentActivity() {
@@ -85,6 +87,12 @@ class MainActivity : ComponentActivity() {
                     factory = object : ViewModelProvider.Factory {
                         override fun <T : ViewModel> create(modelClass: Class<T>): T {
                             return KaliViewModel(handshakeDao, applicationContext) as T
+                        }
+
+                        private fun isTrustedApkUri(uri: Uri): Boolean {
+                            return uri.scheme == "https" &&
+                                uri.host == "github.com" &&
+                                (uri.path?.startsWith("/Ice1984m/Kalli-app/") == true)
                         }
                     }
                 )
@@ -1905,7 +1913,11 @@ fun TopStatusPanel(viewModel: KaliViewModel) {
 @Composable
 fun DashboardTab(viewModel: KaliViewModel) {
     val lazyListState = rememberLazyListState()
+    val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+    val apkDownloadUrl = BuildConfig.APK_DOWNLOAD_URL
+    val parsedApkUri = remember(apkDownloadUrl) { Uri.parse(apkDownloadUrl) }
+    val isTrustedApkUrl = isTrustedApkUri(parsedApkUri)
     
     // Automatically scrolls terminal to the end when logs change
     LaunchedEffect(viewModel.terminalLogs.size) {
@@ -1942,18 +1954,42 @@ fun DashboardTab(viewModel: KaliViewModel) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = APK_DOWNLOAD_URL,
+                    text = apkDownloadUrl,
                     fontSize = 10.sp,
                     color = KaliSecondary,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.semantics {
+                        contentDescription = "APK download URL: $apkDownloadUrl"
+                    }
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 Button(
-                    onClick = { uriHandler.openUri(APK_DOWNLOAD_URL) },
+                    onClick = {
+                        if (!isTrustedApkUrl) {
+                            Toast.makeText(context, "Ongeldige downloadlink geconfigureerd.", Toast.LENGTH_LONG).show()
+                            return@Button
+                        }
+                        runCatching { uriHandler.openUri(apkDownloadUrl) }
+                            .onFailure { error ->
+                                Log.e(
+                                    "DashboardTab",
+                                    "APK-link openen mislukt (${error::class.simpleName}): ${error.message}",
+                                    error
+                                )
+                                Toast.makeText(
+                                    context,
+                                    "Kan link niet openen. Probeer het later opnieuw.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                    },
+                    enabled = isTrustedApkUrl,
                     colors = ButtonDefaults.buttonColors(containerColor = KaliPrimary),
-                    modifier = Modifier.fillMaxWidth().height(38.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(38.dp)
                 ) {
-                    Icon(Icons.Default.Download, contentDescription = null, tint = Color.Black)
+                    Icon(Icons.Default.Download, contentDescription = "Download APK", tint = Color.Black)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Tik hier om te installeren",
