@@ -1,0 +1,6 @@
+{
+  "name": "Kali Linux Suite",
+  "description": "Een overzichtelijk en krachtig mobiel dashboard voor ethisch hacken en wifi-beveiligingstesten met automatische interfaceconfiguratie.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
