@@ -48,8 +48,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="apk-${GITHUB_RUN_NUMBER}"
-          gh release create "$tag" app/build/outputs/apk/debug/app-debug.apk \
-            --title "APK build ${GITHUB_RUN_NUMBER}" \
-            --notes "Automatisch gebouwde debug-APK." \
-            --latest
+          if gh release view latest >/dev/null 2>&1; then
+            gh release edit latest \
+              --title "Nieuwste APK build" \
+              --notes "Automatisch bijgewerkt vanuit main."
+          else
+            gh release create latest \
+              --title "Nieuwste APK build" \
+              --notes "Automatisch bijgewerkt vanuit main." \
+              --latest
+          fi
+          gh release upload latest app/build/outputs/apk/debug/app-debug.apk --clobber
