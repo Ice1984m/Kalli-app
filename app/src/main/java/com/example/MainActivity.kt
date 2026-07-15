@@ -161,6 +161,9 @@ object LocalSecurityAnalyzer {
     private val ipv4Pattern = Regex(
         """\b(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\b"""
     )
+    private val insecureSshPattern = Regex(
+        """(?i)^(permitrootlogin|passwordauthentication)\s+yes\b"""
+    )
 
     fun analyze(text: String): LocalSecurityAnalysis {
         val findings = mutableListOf<SecurityFinding>()
@@ -169,18 +172,18 @@ object LocalSecurityAnalyzer {
             val activeLine = line.trimStart()
             if (activeLine.startsWith("#")) return@forEachIndexed
             if (credentialPattern.containsMatchIn(activeLine)) {
-                findings += SecurityFinding(lineNumber, FindingSeverity.HIGH, "Mogelijk geheim of wachtwoord aangetroffen.")
+                findings += SecurityFinding(lineNumber, FindingSeverity.HIGH, "Mogelijk credential of wachtwoord aangetroffen.")
             }
             if (activeLine.contains("http://", ignoreCase = true)) {
                 findings += SecurityFinding(lineNumber, FindingSeverity.MEDIUM, "Onversleutelde HTTP-verbinding aangetroffen; gebruik HTTPS.")
             }
-            if (Regex("""(?i)^(permitrootlogin|passwordauthentication)\s+yes\b""").containsMatchIn(activeLine)) {
+            if (insecureSshPattern.containsMatchIn(activeLine)) {
                 findings += SecurityFinding(lineNumber, FindingSeverity.HIGH, "Onveilige SSH-instelling aangetroffen.")
             }
         }
         val sanitized = text
             .replace(credentialPattern) {
-                "${it.groupValues[1]}${it.groupValues[2]}[REDACTED]"
+                "${it.groups[1]?.value ?: "secret"}${it.groups[2]?.value ?: "="}[REDACTED]"
             }
             .replace(emailPattern, "[REDACTED_EMAIL]")
             .replace(ipv4Pattern, "[REDACTED_IP]")
@@ -4098,7 +4101,7 @@ fun CopilotTab(viewModel: KaliViewModel) {
             ) {
                 Text("Lokale log- en configuratieanalyse", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Text(
-                    "Plak alleen gegevens waarvoor je bevoegd bent. De analyse vindt lokaal plaats; geheimen, e-mailadressen en alle geldige IPv4-adressen worden in het resultaat gemaskeerd.",
+                    "Plak alleen gegevens waarvoor je bevoegd bent. De analyse vindt lokaal plaats; geheimen, e-mailadressen en IPv4-adressen worden in het resultaat gemaskeerd.",
                     fontSize = 12.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(vertical = 8.dp)
